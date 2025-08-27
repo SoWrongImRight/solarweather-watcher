@@ -53,16 +53,27 @@ jobs:
       - name: Deploy via SSH to Droplet
         uses: appleboy/ssh-action@v1.0.3
         env:
-          # secrets
-          GHCR_PAT: ${{ secrets.GHCR_PAT }}     # optional: needed only if GHCR package is private
-          ENV_FILE: ${{ secrets.ENV_FILE }}     # required: your entire .env contents
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}     # optional: only if GHCR package is private
+          ENV_FILE: ${{ secrets.ENV_FILE }}     # required: your .env contents
         with:
           host: ${{ secrets.DO_HOST }}
-          username: ${{ secrets.DO_SSH_USER }}  # e.g. "root"
-          key: ${{ secrets.DO_SSH_KEY }}        # your private SSH key
+          username: ${{ secrets.DO_SSH_USER }}  # usually root
+          key: ${{ secrets.DO_SSH_KEY }}
           envs: IMAGE_NAME,APP_DIR,CONTAINER_NAME,GHCR_PAT,ENV_FILE
           script: |
             set -euo pipefail
+
+            # --- Install Docker if missing ---
+            if ! command -v docker >/dev/null 2>&1; then
+              echo "==> Docker not found; installing…"
+              apt-get update -y
+              apt-get install -y ca-certificates curl gnupg lsb-release
+              curl -fsSL https://get.docker.com | sh
+              systemctl enable --now docker
+              echo "==> Docker installed."
+            else
+              echo "==> Docker already installed."
+            fi
 
             echo "==> Preparing app directory"
             mkdir -p "$APP_DIR"
@@ -73,7 +84,7 @@ jobs:
             $ENV_FILE
             EOF
 
-            # Optional: login to GHCR if package is private
+            # Optional: login to GHCR if image is private
             if [ -n "${GHCR_PAT:-}" ]; then
               echo "==> Logging in to GHCR on droplet"
               echo "$GHCR_PAT" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
