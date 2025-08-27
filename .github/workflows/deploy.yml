@@ -2,22 +2,16 @@ name: Build & Deploy Spaceweather Watcher
 
 on:
   push:
-    branches: [ master ]
-    paths:
-      - "Dockerfile"
-      - "Cargo.toml"
-      - "src/**"
-      - ".github/workflows/deploy.yml"
+    branches: [ main ]      # change to [ master ] if that's your default
   workflow_dispatch:
-
-env:
-  IMAGE_NAME: ghcr.io/${{ github.repository }}  # ghcr.io/<owner>/<repo>
-  CONTAINER_NAME: spaceweather
-  APP_DIR: /opt/spaceweather
 
 permissions:
   contents: read
-  packages: write   # required to push to GHCR
+  packages: write           # needed to push to GHCR
+
+env:
+  CONTAINER_NAME: spaceweather
+  APP_DIR: /opt/spaceweather
 
 jobs:
   build-and-push:
@@ -25,6 +19,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set IMAGE_NAME (lowercase)
+        run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -50,42 +47,62 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
+      - name: Set IMAGE_NAME (lowercase)
+        run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
       - name: Deploy via SSH to Droplet
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          # secrets
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}     # optional: needed only if GHCR package is private
+          ENV_FILE: ${{ secrets.ENV_FILE }}     # required: your entire .env contents
         with:
           host: ${{ secrets.DO_HOST }}
-          username: ${{ secrets.DO_SSH_USER }}
-          key: ${{ secrets.DO_SSH_KEY }}
+          username: ${{ secrets.DO_SSH_USER }}  # e.g. "root"
+          key: ${{ secrets.DO_SSH_KEY }}        # your private SSH key
+          envs: IMAGE_NAME,APP_DIR,CONTAINER_NAME,GHCR_PAT,ENV_FILE
           script: |
             set -euo pipefail
-            IMAGE="${{ env.IMAGE_NAME }}:latest"
-            APP_DIR="${{ env.APP_DIR }}"
-            CONTAINER="${{ env.CONTAINER_NAME }}"
 
-            mkdir -p "${APP_DIR}"
-            cd "${APP_DIR}"
+            echo "==> Preparing app directory"
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
 
-            # write .env from secret
-            cat > .env <<'EOF'
-            ${{ secrets.ENV_FILE }}
+            echo "==> Writing .env from secret"
+            cat > .env <<EOF
+            $ENV_FILE
             EOF
 
-            # pull and restart
+            # Optional: login to GHCR if package is private
+            if [ -n "${GHCR_PAT:-}" ]; then
+              echo "==> Logging in to GHCR on droplet"
+              echo "$GHCR_PAT" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+            else
+              echo "==> Skipping GHCR login (no GHCR_PAT provided); ensure package is public"
+            fi
+
+            IMAGE="${IMAGE_NAME}:latest"
+
+            echo "==> Pulling image: $IMAGE"
             docker pull "$IMAGE" || true
-            docker rm -f "$CONTAINER" 2>/dev/null || true
+
+            echo "==> Recreating container: $CONTAINER_NAME"
+            docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
             docker run -d \
-              --name "$CONTAINER" \
-              --env-file "${APP_DIR}/.env" \
+              --name "$CONTAINER_NAME" \
+              --env-file "$APP_DIR/.env" \
               --restart unless-stopped \
               "$IMAGE"
 
-            echo "Waiting for container to initialize..."
-            sleep 15
+            echo "==> Waiting for container to report startup..."
+            for i in {1..12}; do   # up to ~60s
+              if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "Startup baseline sent"; then
+                echo "✅ Health check passed: Startup baseline detected."
+                break
+              fi
+              sleep 5
+            done
+            docker logs "$CONTAINER_NAME" 2>&1 | grep -q "Startup baseline sent" || { echo "❌ Health check failed: no startup baseline found in logs."; exit 1; }
 
-            echo "Checking container logs for startup baseline..."
-            if ! docker logs "$CONTAINER" 2>&1 | grep -q "Startup baseline sent"; then
-              echo "❌ Health check failed: Startup baseline email not confirmed in logs."
-              exit 1
-            fi
-
-            echo "✅ Health check passed: Startup baseline detected."
+            echo "==> Showing last 50 log lines"
+            docker logs --tail 50 "$CONTAINER_NAME" || true
