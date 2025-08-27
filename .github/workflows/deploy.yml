@@ -2,12 +2,12 @@ name: Build & Deploy Spaceweather Watcher
 
 on:
   push:
-    branches: [ main ]      # change to [ master ] if that's your default
+    branches: [ master ]
   workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write           # needed to push to GHCR
+  packages: write 
 
 env:
   CONTAINER_NAME: spaceweather
