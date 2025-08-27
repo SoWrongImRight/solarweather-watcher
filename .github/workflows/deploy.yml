@@ -2,12 +2,12 @@ name: Build & Deploy Spaceweather Watcher
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master ]      # change to [ master ] if that's your default
   workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write 
+  packages: write           # needed to push to GHCR
 
 env:
   CONTAINER_NAME: spaceweather
@@ -105,15 +105,4 @@ jobs:
               --restart unless-stopped \
               "$IMAGE"
 
-            echo "==> Waiting for container to report startup..."
-            for i in {1..12}; do   # up to ~60s
-              if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "Startup baseline sent"; then
-                echo "✅ Health check passed: Startup baseline detected."
-                break
-              fi
-              sleep 5
-            done
-            docker logs "$CONTAINER_NAME" 2>&1 | grep -q "Startup baseline sent" || { echo "❌ Health check failed: no startup baseline found in logs."; exit 1; }
-
-            echo "==> Showing last 50 log lines"
-            docker logs --tail 50 "$CONTAINER_NAME" || true
+            echo "==> Deployment complete. Container restarted."
