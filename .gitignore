@@ -1,0 +1,31 @@
+# === Rust build artifacts ===
+/target
+**/*.rs.bk
+
+# === Cargo ===
+Cargo.lock        # optional: include if you want reproducible deps
+
+# === IDE / Editor ===
+*.swp
+*.swo
+*.idea/
+*.vscode/
+*.DS_Store
+
+# === Environment files ===
+.env
+.env.*            # any env variants like .env.prod, .env.dev
+
+# === Docker ===
+*.log
+docker-compose.override.yml
+
+# === Misc ===
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Node-related (if you ever add frontend code here)
+node_modules/
+dist/

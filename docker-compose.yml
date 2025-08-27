@@ -1,0 +1,26 @@
+version: "3.9"
+services:
+  spaceweather:
+    build: .
+    container_name: spaceweather-watcher
+    restart: unless-stopped
+    environment:
+      - LAT=${LAT}
+      - LON=${LON}
+      - LOCAL_TZ=${LOCAL_TZ}
+      - LIS_THRESHOLD=${LIS_THRESHOLD}
+      - G_MIN_NOTIFY=${G_MIN_NOTIFY}
+      - R_MIN_NOTIFY=${R_MIN_NOTIFY}
+      - S_MIN_NOTIFY=${S_MIN_NOTIFY}
+      - SHORT_BZ_NT=${SHORT_BZ_NT}
+      - SHORT_SPD_KMS=${SHORT_SPD_KMS}
+      - DAILY_REPORT_HOUR=${DAILY_REPORT_HOUR}
+      - SMTP_SERVER=${SMTP_SERVER}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - EMAIL_TO=${EMAIL_TO}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_FROM=${TWILIO_FROM}
+      - SMS_TO=${SMS_TO}

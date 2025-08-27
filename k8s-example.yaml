@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spaceweather-watcher
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: spaceweather-watcher }
+  template:
+    metadata:
+      labels: { app: spaceweather-watcher }
+    spec:
+      containers:
+        - name: watcher
+          image: your-registry/spaceweather-watcher:latest
+          envFrom:
+            - secretRef: { name: spaceweather-secrets }
+          imagePullPolicy: Always
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits: { cpu: "250m", memory: "128Mi" }
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: spaceweather-secrets
+stringData:
+  LOCAL_TZ: America/New_York
+  LAT: "28.9"
+  LON: "-81.3"
+  LIS_THRESHOLD: "40"
+  G_MIN_NOTIFY: "2"
+  R_MIN_NOTIFY: "2"
+  S_MIN_NOTIFY: "2"
+  SHORT_BZ_NT: "-10"
+  SHORT_SPD_KMS: "600"
+  DAILY_REPORT_HOUR: "7"
+  SMTP_SERVER: smtp.gmail.com
+  SMTP_USERNAME: your_user@gmail.com
+  SMTP_PASSWORD: your_app_password
+  EMAIL_FROM: Space Weather <your_user@gmail.com>
+  EMAIL_TO: Russ <you@example.com>
+  TWILIO_ACCOUNT_SID: ACxxxxxxxxxxxxxxxxxxxxxxxx
+  TWILIO_AUTH_TOKEN: xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  TWILIO_FROM: +1XXXXXXXXXX
+  SMS_TO: +1YYYYYYYYYY
